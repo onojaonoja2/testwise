@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tests     Test[]
+}
+
+model Test {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  duration    Int       // in minutes
+  type        String    // multiple-choice, essay, mixed
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  creatorId   String
+  creator     User      @relation(fields: [creatorId], references: [id])
+  questions   Question[]
+  attempts    Attempt[]
+}
+
+model Question {
+  id       String   @id @default(cuid())
+  type     String   // multiple-choice, essay
+  text     String
+  options  Json?    // for multiple choice questions
+  answer   String?  // for multiple choice questions
+  points   Int      @default(1)
+  testId   String
+  test     Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  answers  Answer[]
+}
+
+model Attempt {
+  id        String   @id @default(cuid())
+  startTime DateTime @default(now())
+  endTime   DateTime?
+  score     Int?
+  testId    String
+  test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  answers   Answer[]
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  text       String
+  isCorrect  Boolean?
+  points     Int?
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attemptId  String
+  attempt    Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+}

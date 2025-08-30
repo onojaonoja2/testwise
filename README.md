@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TestWise
+
+A secure, time-limited test application built with Next.js, Prisma, and SQLite.
+
+## Features
+
+- 🔐 Secure user authentication
+- 📝 Create and manage time-limited tests
+- 🎯 Multiple question types support
+- ⏱️ Automatic test scheduling
+- 📊 Test results and analytics
+
+## Tech Stack
+
+- **Framework:** Next.js 14
+- **Database:** SQLite (via Prisma)
+- **Authentication:** NextAuth.js
+- **UI Components:** Shadcn/ui
+- **Styling:** Tailwind CSS
+- **Language:** TypeScript
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/testwise.git
+cd testwise
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Set up environment variables:
+
+Copy `.env.example` to `.env` and update the values:
+
+```bash
+cp .env.example .env
+```
+
+4. Initialize the database:
+
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+5. Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+├── app/                 # Next.js app directory
+│   ├── (auth)/         # Authentication routes
+│   ├── (dashboard)/    # Dashboard routes
+│   └── api/            # API routes
+├── components/         # UI components
+├── lib/                # Utility functions
+├── prisma/            # Database schema and migrations
+└── public/            # Static assets
+```
 
-## Learn More
+## API Routes
 
-To learn more about Next.js, take a look at the following resources:
+- `POST /api/auth/register` - Register a new user
+- `POST /api/tests` - Create a new test
+- `GET /api/tests` - Get all tests for the authenticated user
+- `GET /api/tests/[id]` - Get a specific test
+- `PUT /api/tests/[id]` - Update a test
+- `DELETE /api/tests/[id]` - Delete a test
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Contributing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the MIT License - see the LICENSE file for details.
