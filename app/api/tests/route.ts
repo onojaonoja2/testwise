@@ -60,6 +60,11 @@ export async function GET(req: Request) {
       where: {
         creatorId: session.user.id
       },
+      include: {
+        _count: {
+          select: { attempts: true }
+        }
+      },
       orderBy: {
         createdAt: 'desc'
       }

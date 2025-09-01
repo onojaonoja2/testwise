@@ -8,7 +8,7 @@ export async function POST(req: Request) {
 
     if (!name || !email || !password) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { message: 'Missing required fields' },
         { status: 400 }
       )
     }
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'User already exists' },
+        { message: 'User already exists' },
         { status: 400 }
       )
     }
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { message: 'Internal server error' },
       { status: 500 }
     )
   }

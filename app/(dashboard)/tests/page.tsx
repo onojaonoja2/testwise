@@ -1,26 +1,49 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
-// Placeholder data for demonstration
-const tests = [
-  {
-    id: 1,
-    title: 'Sample Test 1',
-    type: 'Multiple Choice',
-    duration: 60,
-    status: 'Active',
-    startDate: '2024-02-01T10:00',
-    endDate: '2024-02-28T23:59',
-  },
-  // Add more test entries as needed
-]
+interface Test {
+  id: string;
+  title: string;
+  type: string;
+  duration: number;
+  startDate: string;
+  endDate: string;
+  _count: {
+    attempts: number;
+  };
+}
 
 export default function TestsPage() {
+  const [tests, setTests] = useState<Test[]>([])
+  const router = useRouter()
+
+  useEffect(() => {
+    const fetchTests = async () => {
+      const res = await fetch('/api/tests')
+      if (res.ok) {
+        const data = await res.json()
+        setTests(data)
+      }
+    }
+    fetchTests()
+  }, [])
+
+  const getStatus = (startDate: string, endDate: string) => {
+    const now = new Date()
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    if (now < start) return 'Scheduled'
+    if (now > end) return 'Ended'
+    return 'Active'
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -45,8 +68,7 @@ export default function TestsPage() {
                 <TableHead>Type</TableHead>
                 <TableHead>Duration (mins)</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
+                <TableHead>Attempts</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -57,16 +79,14 @@ export default function TestsPage() {
                   <TableCell>{test.type}</TableCell>
                   <TableCell>{test.duration}</TableCell>
                   <TableCell>
-                    <Badge variant={test.status === 'Active' ? 'default' : 'secondary'}>
-                      {test.status}
+                    <Badge variant={getStatus(test.startDate, test.endDate) === 'Active' ? 'default' : 'secondary'}>
+                      {getStatus(test.startDate, test.endDate)}
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(test.startDate).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(test.endDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{test._count.attempts}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm">View Results</Button>
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/tests/${test.id}/results`)}>View Results</Button>
                     </div>
                   </TableCell>
                 </TableRow>

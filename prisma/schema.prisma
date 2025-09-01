@@ -15,6 +15,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   tests     Test[]
+  attempts  Attempt[]
 }
 
 model Test {
@@ -50,8 +51,11 @@ model Attempt {
   startTime DateTime @default(now())
   endTime   DateTime?
   score     Int?
+  status    String   @default("started") // e.g., started, completed, terminated, timed-out
   testId    String
   test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  takerId   String
+  taker     User     @relation(fields: [takerId], references: [id])
   answers   Answer[]
 }
 
