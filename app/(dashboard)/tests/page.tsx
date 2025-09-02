@@ -51,7 +51,7 @@ export default function TestsPage() {
           <h2 className="text-2xl font-bold">My Tests</h2>
           <p className="text-gray-500">Manage your created tests</p>
         </div>
-        <Link href="/dashboard/tests/create">
+        <Link href="/tests/create">
           <Button>Create New Test</Button>
         </Link>
       </div>
@@ -86,7 +86,7 @@ export default function TestsPage() {
                   <TableCell>{test._count.attempts}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/tests/${test.id}/results`)}>View Results</Button>
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/tests/${test.id}/results`)}>View Results</Button>
                     </div>
                   </TableCell>
                 </TableRow>

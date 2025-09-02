@@ -8,19 +8,13 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { title, description, duration, type, startDate, endDate } = await req.json()
+    const { title, description, duration, type, startDate, endDate, questions } = await req.json()
 
-    if (!title || !duration || !type || !startDate || !endDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+    if (!title || !duration || !type || !startDate || !endDate || !questions || !Array.isArray(questions)) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const test = await prisma.test.create({
@@ -31,21 +25,38 @@ export async function POST(req: Request) {
         type,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
-        creatorId: session.user.id
-      }
+        creatorId: session.user.id,
+        questions: {
+          create: questions.map(q => ({
+            text: q.text,
+            points: q.points,
+            type: q.type,
+            options: {
+              create: q.options.map(o => ({
+                text: o.text,
+                isCorrect: o.isCorrect,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        questions: {
+          include: {
+            options: true,
+          },
+        },
+      },
     })
 
     return NextResponse.json(test, { status: 201 })
   } catch (error) {
     console.error('Test creation error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 

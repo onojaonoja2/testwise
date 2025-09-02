@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart, Clock, Users } from 'lucide-react'
 
@@ -111,8 +111,23 @@ export default function HomePage() {
 }
 
 // Dashboard component for authenticated users
-function DashboardContent({ session }: { session: any }) {
+function DashboardContent({ session }: { session: { user?: { name?: string | null } } }) {
   const router = useRouter()
+  const [stats, setStats] = useState({ totalTests: 0, activeTests: 0, totalParticipants: 0 })
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const res = await fetch('/api/tests')
+      if (res.ok) {
+        const tests = await res.json()
+        const now = new Date()
+        const activeTests = tests.filter(test => new Date(test.startDate) <= now && new Date(test.endDate) >= now).length
+        const totalParticipants = tests.reduce((sum, test) => sum + test._count.attempts, 0)
+        setStats({ totalTests: tests.length, activeTests, totalParticipants })
+      }
+    }
+    fetchStats()
+  }, [])
 
   const handleSignOut = async () => {
     await signOut({ redirect: false })
@@ -155,7 +170,7 @@ function DashboardContent({ session }: { session: any }) {
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold">Dashboard</h2>
-            <p className="text-gray-500">Welcome back! Here's an overview of your tests</p>
+            <p className="text-gray-500">Welcome back! Here&apos;s an overview of your tests</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -165,7 +180,7 @@ function DashboardContent({ session }: { session: any }) {
                 <BarChart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.totalTests}</div>
                 <p className="text-xs text-muted-foreground">Tests created</p>
               </CardContent>
             </Card>
@@ -176,7 +191,7 @@ function DashboardContent({ session }: { session: any }) {
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.activeTests}</div>
                 <p className="text-xs text-muted-foreground">Currently running</p>
               </CardContent>
             </Card>
@@ -187,7 +202,7 @@ function DashboardContent({ session }: { session: any }) {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.totalParticipants}</div>
                 <p className="text-xs text-muted-foreground">Across all tests</p>
               </CardContent>
             </Card>

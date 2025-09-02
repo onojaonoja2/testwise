@@ -1,17 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-export async function GET(req: Request, { params }: { params: { attemptId: string } }) {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const attempt = await prisma.attempt.findUnique({
-      where: { id: params.attemptId },
+    const attemptId = req.nextUrl.pathname.split('/').pop()
+      const attempt = await prisma.attempt.findUnique({
+      where: { id: attemptId },
       include: {
         test: { select: { title: true, creatorId: true } },
         taker: { select: { name: true, id: true } },

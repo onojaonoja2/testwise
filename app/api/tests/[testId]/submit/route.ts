@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-export async function POST(req: Request, { params }: { params: { testId: string } }) {
+export async function POST(req: Request) {
   try {
     const { attemptId, answers, status } = await req.json()
 
@@ -11,7 +11,17 @@ export async function POST(req: Request, { params }: { params: { testId: string 
 
     const attempt = await prisma.attempt.findUnique({
       where: { id: attemptId },
-      include: { test: { include: { questions: true } } },
+      include: {
+        test: {
+          include: {
+            questions: {
+              include: {
+                options: true,
+              },
+            },
+          },
+        },
+      },
     })
 
     if (!attempt) {
@@ -26,7 +36,10 @@ export async function POST(req: Request, { params }: { params: { testId: string 
       if (userAnswer) {
         let isCorrect = false
         if (question.type === 'multiple-choice') {
-          isCorrect = userAnswer === question.answer
+          const correctOption = question.options.find(o => o.isCorrect)
+          if (correctOption) {
+            isCorrect = userAnswer === correctOption.id
+          }
         }
         
         if (isCorrect) {

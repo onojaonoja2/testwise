@@ -31,8 +31,7 @@ export async function POST(req: Request, { params }: { params: { testId: string 
       },
     })
 
-    // Don't send answers in the response
-    const questions = test.questions.map(({ answer, ...q }) => q)
+    const questions = test.questions.map(q => ({ id: q.id, text: q.text, type: q.type, options: q.options }))
 
     return NextResponse.json({ test: { ...test, questions }, attempt })
   } catch (error) {

@@ -11,11 +11,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 
 // Define types for our data
+interface Option {
+  id: string;
+  text: string;
+}
+
 interface Question {
   id: string;
   text: string;
   type: string;
-  options: any;
+  options: Option[];
 }
 
 interface Test {
@@ -28,7 +33,7 @@ interface Test {
 export default function TakeTestPage() {
   const params = useParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  const {  } = useSession()
   const testId = params.testId as string
 
   const [test, setTest] = useState<Test | null>(null)
@@ -37,6 +42,7 @@ export default function TakeTestPage() {
   const [attemptId, setAttemptId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [testStarted, setTestStarted] = useState(false)
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const visibilityChangeRef = useRef<() => void>()
@@ -57,43 +63,57 @@ export default function TakeTestPage() {
     }
   }
 
-  const handleVisibilityChange = () => {
+  const handleVisibilityChange = useCallback(() => {
     if (document.hidden) {
       submitTest('terminated')
     }
-  }
+  }, [submitTest])
 
-  const handleFullscreenChange = () => {
+  const handleFullscreenChange = useCallback(() => {
     if (!document.fullscreenElement) {
       submitTest('terminated')
     }
-  }
+  }, [submitTest])
 
   useEffect(() => {
     if (testId) {
-      const startTest = async () => {
+      const fetchTest = async () => {
         try {
-          const res = await fetch(`/api/tests/${testId}/start`, {
-            method: 'POST',
-          })
+          const res = await fetch(`/api/tests/${testId}`)
           if (!res.ok) {
             const { message } = await res.json()
             throw new Error(message)
           }
-          const { test: testData, attempt } = await res.json()
+          const testData = await res.json()
           setTest(testData)
-          setAttemptId(attempt.id)
-          setTimeLeft(testData.duration * 60)
-          setIsLoading(false)
-          enterFullScreen()
-        } catch (err: any) {
-          setError(err.message)
+        } catch (err) {
+          setError((err as Error).message)
+        } finally {
           setIsLoading(false)
         }
       }
-      startTest()
+      fetchTest()
     }
   }, [testId])
+
+  const handleStartTest = async () => {
+    try {
+      const res = await fetch(`/api/tests/${testId}/start`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const { message } = await res.json()
+        throw new Error(message)
+      }
+      const { attempt, test: testData } = await res.json()
+      setAttemptId(attempt.id)
+      setTestStarted(true)
+      setTimeLeft(testData.duration * 60)
+      enterFullScreen()
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  };
 
   useEffect(() => {
     if (timeLeft === null) return
@@ -110,7 +130,7 @@ export default function TakeTestPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [timeLeft])
+  }, [timeLeft, submitTest])
 
   useEffect(() => {
     visibilityChangeRef.current = handleVisibilityChange
@@ -127,19 +147,19 @@ export default function TakeTestPage() {
     window.addEventListener('beforeunload', handleBeforeUnload)
 
     return () => {
-      document.removeEventListener('visibilitychange', visibilityChangeRef.current!)
-      document.removeEventListener('fullscreenchange', fullscreenChangeRef.current!)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
       window.removeEventListener('beforeunload', handleBeforeUnload)
       if (timerRef.current) clearInterval(timerRef.current)
       exitFullScreen()
     }
-  }, [])
+  }, [handleFullscreenChange, handleVisibilityChange, submitTest])
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
   }
 
-  const submitTest = async (status: 'completed' | 'terminated' | 'timed-out') => {
+  const submitTest = useCallback(async (status: 'completed' | 'terminated' | 'timed-out') => {
     if (timerRef.current) clearInterval(timerRef.current)
     
     if (!attemptId) return
@@ -152,7 +172,7 @@ export default function TakeTestPage() {
 
     exitFullScreen()
     router.push(`/dashboard/tests/results/${attemptId}`)
-  }
+  }, [attemptId, answers, router, testId])
 
   if (isLoading) return <div>Loading test...</div>
   if (error) return <div>Error: {error}</div>
@@ -162,6 +182,25 @@ export default function TakeTestPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (!testStarted) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <CardTitle>{test.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">You are about to start the test. Once you begin, you will enter full-screen mode and will not be able to exit without terminating the test.</p>
+            <p className="mb-4"><strong>Duration:</strong> {test.duration} minutes</p>
+            <Button onClick={handleStartTest} className="w-full">
+              Start Test
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -189,10 +228,10 @@ export default function TakeTestPage() {
                 <p className="font-semibold">{index + 1}. {q.text}</p>
                 {q.type === 'multiple-choice' ? (
                   <RadioGroup onValueChange={(value) => handleAnswerChange(q.id, value)}>
-                    {q.options.map((option: string, i: number) => (
-                      <div key={i} className="flex items-center space-x-2">
-                        <RadioGroupItem value={option} id={`${q.id}-${i}`} />
-                        <Label htmlFor={`${q.id}-${i}`}>{option}</Label>
+                    {q.options.map((option: Option, i: number) => (
+                      <div key={option.id} className="flex items-center space-x-2">
+                        <RadioGroupItem value={option.id} id={`${q.id}-${i}`} />
+                        <Label htmlFor={`${q.id}-${i}`}>{option.text}</Label>
                       </div>
                     ))}
                   </RadioGroup>

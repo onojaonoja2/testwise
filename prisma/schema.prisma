@@ -38,12 +38,19 @@ model Question {
   id       String   @id @default(cuid())
   type     String   // multiple-choice, essay
   text     String
-  options  Json?    // for multiple choice questions
-  answer   String?  // for multiple choice questions
   points   Int      @default(1)
   testId   String
   test     Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  options  Option[]
   answers  Answer[]
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  text       String
+  isCorrect  Boolean  @default(false)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model Attempt {

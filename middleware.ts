@@ -1,7 +1,7 @@
 import { withAuth } from 'next-auth/middleware'
 
 export default withAuth(
-  function middleware(req) {
+  function middleware() {
     // Add any custom middleware logic here
   },
   {
@@ -20,15 +20,18 @@ export default withAuth(
           return !!token
         }
         
-        // For the root path, check if it's the dashboard (authenticated) or landing (public)
+        // For the root path, redirect to login if not authenticated
         if (pathname === '/') {
-          // If user has token, allow access to dashboard
-          // If no token, they should be redirected to landing page
-          return true // Let the component handle the logic
+          if (!token) {
+            const url = req.nextUrl.clone()
+            url.pathname = '/login'
+            return false // Redirect to login
+          }
+          return true // Allow access to dashboard
         }
         
-        // Default allow for other routes
-        return true
+        // Deny access to all other routes by default
+        return false
       },
     },
   }

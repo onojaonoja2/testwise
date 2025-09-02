@@ -37,8 +37,8 @@ export default function TestResultPage() {
           }
           const data = await res.json()
           setAttempt(data)
-        } catch (err: any) {
-          setError(err.message)
+        } catch (err) {
+          setError((err as Error).message)
         } finally {
           setIsLoading(false)
         }
