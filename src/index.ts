@@ -1,16 +1,16 @@
 import { Elysia } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { db } from './db';
-import { auth } from './auth'; // <-- Import the new consolidated plugin
+import { auth } from './auth';
 import { userRoutes } from './routes/users';
+import { testRoutes } from './routes/tests'; // <-- Import test routes
 
 const app = new Elysia()
   .use(swagger())
   .decorate('db', db)
-  // Apply the single auth plugin. It provides context and the auth routes.
   .use(auth)
-  // Apply the user routes, which will now have access to the auth context.
   .use(userRoutes)
+  .use(testRoutes) // <-- Use the test routes
   .get('/', () => ({ status: 'ok' }))
   .listen(3000);
 
