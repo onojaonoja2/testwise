@@ -15,6 +15,13 @@
       "when": 1758288410855,
       "tag": "0001_mean_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1758306949077,
+      "tag": "0002_cultured_whizzer",
+      "breakpoints": true
     }
   ]
 }

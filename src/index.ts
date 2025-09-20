@@ -4,6 +4,7 @@ import { db } from './db';
 import { auth } from './auth';
 import { userRoutes } from './routes/users';
 import { testRoutes } from './routes/tests'; // <-- Import test routes
+import { sessionRoutes } from './routes/sessions';
 
 const app = new Elysia()
   .use(swagger())
@@ -11,6 +12,7 @@ const app = new Elysia()
   .use(auth)
   .use(userRoutes)
   .use(testRoutes) // <-- Use the test routes
+  .use(sessionRoutes) // <-- Use the session routes
   .get('/', () => ({ status: 'ok' }))
   .listen(3000);
 
