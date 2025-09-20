@@ -8,6 +8,7 @@ import CreateTestPage from './components/forms/TestForm';
 import { Toaster } from 'sonner'; // <-- 1. Import from 'sonner'
 import EditTestPage from './pages/EditTestPage';
 import TakeTestPage from './pages/TakeTestPage';
+import AvailableTestsPage from './pages/AvailableTestsPage';
 
 function App() {
   return (
@@ -19,10 +20,10 @@ function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<DashboardPage />}>
-            <Route index element={<Navigate to="tests" replace />} />
             <Route path="tests" element={<TestListPage />} />
             <Route path="tests/new" element={<CreateTestPage />} />
             <Route path="tests/:testId/edit" element={<EditTestPage />} />
+            <Route path="available-tests" element={<AvailableTestsPage />} />
              
           </Route>
           <Route path="/tests/:testId/take" element={<TakeTestPage />} />

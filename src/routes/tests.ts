@@ -34,6 +34,35 @@ export const testRoutes = new Elysia({ prefix: '/api/tests' })
       return { success: false, message: 'Unauthorized' };
     }
   })
+
+  // --- NEW: Endpoint for Test Takers ---
+  .get('/published', async () => {
+    const publishedTests = await db.query.tests.findMany({
+      where: eq(tests.status, 'Published'),
+      columns: {
+        id: true,
+        title: true,
+        description: true,
+        durationMinutes: true,
+        createdAt: true,
+      },
+      with: {
+        creator: {
+            columns: {
+                email: true // Show who created the test
+            }
+        }
+      },
+      orderBy: (tests, { desc }) => [desc(tests.createdAt)],
+    });
+
+    return {
+      success: true,
+      message: 'Published tests retrieved successfully.',
+      data: publishedTests,
+    };
+  })
+
   // --- Creator/Admin Only Routes ---
   .guard(
     {
