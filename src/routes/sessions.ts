@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../db';
-import { testSessions, responses, questions, options } from '../db/schema';
+import { testSessions, responses, questions, options, tests } from '../db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 
 // --- Validation Schemas (DTOs) ---
@@ -25,6 +25,51 @@ export const sessionRoutes = new Elysia({ prefix: '/api/sessions' })
       return { success: false, message: 'Unauthorized' };
     }
   })
+  
+  // --- NEW: GET /api/sessions/:sessionId (Resume a session) ---
+  .get(
+    '/:sessionId',
+    async ({ user, params, set }) => {
+      const { sessionId } = params;
+
+      // 1. Find the session and verify ownership and status
+      const session = await db.query.testSessions.findFirst({
+        where: and(
+          eq(testSessions.id, sessionId),
+          eq(testSessions.takerId, user!.id),
+          eq(testSessions.status, 'In Progress')
+        ),
+        columns: { testId: true }
+      });
+
+      if (!session) {
+        set.status = 404;
+        return { success: false, message: 'In-progress session not found for this user.' };
+      }
+
+      // 2. Fetch the test data for the taker, excluding correct answers
+      const testForTaker = await db.query.tests.findFirst({
+        where: eq(tests.id, session.testId),
+        columns: { id: true, title: true, description: true, durationMinutes: true },
+        with: {
+          questions: {
+            columns: { id: true, questionText: true, questionType: true, order: true },
+            with: { options: { columns: { id: true, optionText: true } } },
+            orderBy: (questions, { asc }) => [asc(questions.order)],
+          },
+        },
+      });
+      
+      if (!testForTaker) {
+          set.status = 404;
+          return { success: false, message: 'Associated test not found.' };
+      }
+
+      return { success: true, data: { test: testForTaker } };
+    },
+    { params: t.Object({ sessionId: t.String({ format: 'uuid' }) }) }
+  )
+
   .post(
     '/:sessionId/submit',
     async ({ user, params, body, set }) => {

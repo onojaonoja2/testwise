@@ -1,7 +1,6 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import apiClient from '@/api/axios';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -9,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
 
 // Schemas can be exported and reused
 export const optionSchema = z.object({
@@ -34,12 +32,12 @@ export const testFormSchema = z.object({
 export type TestFormValues = z.infer<typeof testFormSchema>;
 
 interface TestFormProps {
-  mode: 'create' | 'edit';
-  initialData?: TestFormValues;
-  testId?: string;
+  initialData?: Partial<TestFormValues>;
+  onSubmit: (data: TestFormValues) => void;
+  isSubmitting: boolean;
 }
 
-export default function TestForm({ mode, initialData, testId }: TestFormProps) {
+export default function TestForm({ initialData, onSubmit, isSubmitting }: TestFormProps) {
   const navigate = useNavigate();
 
   const form = useForm<TestFormValues>({
@@ -59,28 +57,9 @@ export default function TestForm({ mode, initialData, testId }: TestFormProps) {
 
   const addQuestion = () => append({ questionText: '', questionType: 'Multiple Choice', order: fields.length + 1, options: [{ optionText: '', isCorrect: true }] });
 
-  async function onSubmit(data: TestFormValues) {
-    try {
-      if (mode === 'edit') {
-        await apiClient.put(`/tests/${testId}`, data);
-        toast.success("Success!", { description: "Your test has been updated." });
-      } else {
-        await apiClient.post('/tests', data);
-        toast.success("Success!", { description: "Your test has been created." });
-      }
-      navigate('/dashboard/tests');
-    } catch (error: any) {
-      toast.error("Oh no! Something went wrong.", {
-        description: error.response?.data?.message || `Failed to ${mode} the test.`,
-      });
-    }
-  }
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {/* Test Details Fields, Question Section, and Buttons are IDENTICAL to CreateTestPage */}
-        {/* No changes needed for the JSX part */}
         <div className="space-y-4">
             <FormField control={form.control} name="title" render={({ field }) => ( <FormItem><FormLabel>Test Title</FormLabel><FormControl><Input placeholder="e.g., Basic Algebra Quiz" {...field} /></FormControl><FormMessage /></FormItem> )}/>
             <FormField control={form.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the test..." {...field} /></FormControl><FormMessage /></FormItem> )}/>
@@ -97,7 +76,7 @@ export default function TestForm({ mode, initialData, testId }: TestFormProps) {
         <Separator />
         <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => navigate('/dashboard/tests')}>Cancel</Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Saving...' : 'Save Test'}</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Test'}</Button>
         </div>
       </form>
     </Form>

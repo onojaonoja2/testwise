@@ -1,7 +1,7 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import apiClient from '@/api/axios';
-import { toast } from 'sonner';
+import { toast } from "sonner"; // Correct import for Sonner
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import Timer from '@/components/tests/Timer';
 
 // Define types for the test data we receive
 interface Option { id: string; optionText: string; }
@@ -25,38 +26,37 @@ interface Answer {
 }
 
 export default function TakeTestPage() {
-  const { testId } = useParams<{ testId: string }>();
+  const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [testData, setTestData] = useState<TestData | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [testData, setTestData] = useState<TestData | null>(location.state?.testData);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!testData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [results, setResults] = useState<{ score: string, totalQuestions: number } | null>(null);
 
   useEffect(() => {
-    const startTestSession = async () => {
-      if (!testId) return;
-      try {
-        const response = await apiClient.post(`/tests/${testId}/start`);
-        const { sessionId, test } = response.data.data;
-        setSessionId(sessionId);
-        setTestData(test);
-        // Initialize answers array
-        setAnswers(test.questions.map((q: Question) => ({ questionId: q.id })));
-      } catch (error: any) {
-        toast.error("Failed to start test session", {
-          description: error.response?.data?.message || "Please try again later.",
-        });
-        navigate('/dashboard'); // Redirect if session fails to start
-      } finally {
-        setIsLoading(false);
+    // If the component loads without test data (e.g., on a resume/refresh), fetch it.
+    const fetchSessionData = async () => {
+      if (!testData && sessionId) {
+        try {
+          setIsLoading(true);
+          const response = await apiClient.get(`/sessions/${sessionId}`);
+          setTestData(response.data.data.test);
+          setAnswers(response.data.data.test.questions.map((q: Question) => ({ questionId: q.id })));
+        } catch (error) {
+          toast.error("Could not load test session.");
+          navigate('/dashboard');
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
-    startTestSession();
-  }, [testId, navigate]);
+
+    fetchSessionData();
+  }, [sessionId, testData, navigate]);
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prevAnswers =>
@@ -72,15 +72,21 @@ export default function TakeTestPage() {
     try {
         const response = await apiClient.post(`/sessions/${sessionId}/submit`, { responses: answers });
         setResults(response.data.data);
-    } catch (error: any) {
-        toast.error("Submission Failed", { description: error.response?.data?.message || "Could not submit your test." });
+        toast.success("Test Submitted!", {
+            description: `Your final score is ${response.data.data.score}%`,
+        });
+    } catch (err: any) {
+        toast.error('Submission Failed', {
+            description: err.response?.data?.message || "Could not submit your test."
+        });
     } finally {
         setIsSubmitting(false);
     }
   };
 
-  if (isLoading) return <div>Preparing your test...</div>;
-  if (!testData) return <div>Could not load test data.</div>;
+  if (isLoading || !testData) {
+    return <div>Loading test session...</div>;
+  }
 
   const currentQuestion = testData.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / testData.questions.length) * 100;

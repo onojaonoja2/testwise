@@ -173,11 +173,20 @@ export const testRoutes = new Elysia({ prefix: '/api/tests' })
       }
       const existingSession = await db.query.testSessions.findFirst({
         where: and(eq(testSessions.testId, testId), eq(testSessions.takerId, user!.id), eq(testSessions.status, 'In Progress')),
+        columns: { id: true }
       });
       if (existingSession) {
-        set.status = 409;
-        return { success: false, message: 'You already have a session in progress for this test.' };
-      }
+          // --- THIS IS THE NEW LOGIC ---
+          // Instead of a 409, return a 200 OK with the existing session info
+          return {
+            success: true,
+            message: 'An existing session is in progress.',
+            data: {
+              sessionState: 'in-progress',
+              sessionId: existingSession.id,
+            },
+          };
+        }
       const [newSession] = await db.insert(testSessions).values({ testId, takerId: user!.id }).returning({ id: testSessions.id, startedAt: testSessions.startedAt });
       const testForTaker = await db.query.tests.findFirst({
         where: eq(tests.id, testId),
@@ -194,7 +203,7 @@ export const testRoutes = new Elysia({ prefix: '/api/tests' })
       return {
         success: true,
         message: 'Test session started successfully.',
-        data: { sessionId: newSession.id, startedAt: newSession.startedAt, test: testForTaker },
+        data: { sessionState: 'new', sessionId: newSession.id, startedAt: newSession.startedAt, test: testForTaker },
       };
     },
     { params: t.Object({ id: t.String({ format: 'uuid' }) }) }

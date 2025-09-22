@@ -1,57 +1,60 @@
-import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import apiClient from '@/api/axios';
-import TestForm, { type TestFormValues } from '@/components/forms/TestForm'; // We'll create this next
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import TestForm, { type TestFormValues } from '@/components/forms/TestForm';
 
 export default function EditTestPage() {
   const { testId } = useParams<{ testId: string }>();
-  const [testData, setTestData] = useState<TestFormValues | null>(null);
+  const navigate = useNavigate();
+  const [initialData, setInitialData] = useState<TestFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!testId) return;
-
-    const fetchTestData = async () => {
+    const fetchTest = async () => {
       try {
         const response = await apiClient.get(`/tests/${testId}`);
         if (response.data.success) {
-          // Map the API response to our form's expected structure
-          const fetchedData = response.data.data;
-          const formattedData: TestFormValues = {
-            title: fetchedData.title,
-            description: fetchedData.description || '',
-            durationMinutes: fetchedData.durationMinutes,
-            questions: fetchedData.questions.map((q: any) => ({
-              questionText: q.questionText,
-              questionType: q.questionType,
-              order: q.order,
-              options: q.options ? q.options.map((opt: any) => ({
-                optionText: opt.optionText,
-                isCorrect: opt.isCorrect,
-              })) : [],
-            })),
-          };
-          setTestData(formattedData);
+          // The form component expects a specific shape, so we ensure the data matches.
+          const { title, description, durationMinutes, questions } = response.data.data;
+          setInitialData({ title, description, durationMinutes, questions });
         }
-      } catch (err) {
-        setError('Failed to load test data.');
-        console.error(err);
+      } catch (error) {
+        toast.error('Failed to fetch test data.');
+        navigate('/dashboard/tests');
       } finally {
         setIsLoading(false);
       }
     };
+    fetchTest();
+  }, [testId, navigate]);
 
-    fetchTestData();
-  }, [testId]);
-
-  if (isLoading) {
-    return <div>Loading test data...</div>;
+  async function handleUpdateTest(data: TestFormValues) {
+    setIsSubmitting(true);
+    try {
+      await apiClient.put(`/tests/${testId}`, data);
+      toast.success('Your test has been updated successfully.');
+      navigate('/dashboard/tests');
+    } catch (error: any) {
+      toast.error('Failed to update the test.', {
+        description: error.response?.data?.message || 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  if (error) {
-    return <div className="text-destructive">{error}</div>;
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Test</CardTitle>
+        </CardHeader>
+        <CardContent>Loading form data...</CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -61,10 +64,14 @@ export default function EditTestPage() {
         <CardDescription>Update the details of your test below.</CardDescription>
       </CardHeader>
       <CardContent>
-        {testData ? (
-          <TestForm mode="edit" initialData={testData} testId={testId} />
+        {initialData ? (
+          <TestForm
+            initialData={initialData}
+            onSubmit={handleUpdateTest}
+            isSubmitting={isSubmitting}
+          />
         ) : (
-          <div>Test data could not be loaded.</div>
+          <div>Could not load test data for editing.</div>
         )}
       </CardContent>
     </Card>
