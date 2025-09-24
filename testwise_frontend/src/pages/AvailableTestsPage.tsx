@@ -67,11 +67,7 @@ export default function AvailableTestsPage() {
 
   const resumeSession = () => {
     if (resumeSessionInfo) {
-      // To resume, we need to fetch the test data again, as it wasn't sent
-      // in the 'in-progress' response. A better approach might be to create a new
-      // endpoint like GET /sessions/:sessionId/resume that provides the test data.
-      // For now, we will just navigate, and the TakeTestPage will need to handle fetching.
-      toast({ title: "Resuming test..." });
+      toast.info("Resuming test session...");
       navigate(`/dashboard/take-test/${resumeSessionInfo.sessionId}`);
       setResumeSessionInfo(null);
     }

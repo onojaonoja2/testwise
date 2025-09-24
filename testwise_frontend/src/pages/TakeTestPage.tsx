@@ -9,7 +9,6 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Timer from '@/components/tests/Timer';
 
 // Define types for the test data we receive
@@ -17,101 +16,113 @@ interface Option { id: string; optionText: string; }
 interface Question { id: string; questionText: string; questionType: string; order: number; options: Option[]; }
 interface TestData { id: string; title: string; description: string; durationMinutes: number; questions: Question[]; }
 
-// Define type for a single answer
-interface Answer {
+// Let's simplify the Answer type for clarity
+type AnswerPayload = {
   questionId: string;
   selectedOptionId?: string;
-  shortAnswerText?: string;
   trueFalseAnswer?: boolean;
-}
+  shortAnswerText?: string;
+};
 
 export default function TakeTestPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [testData, setTestData] = useState<TestData | null>(location.state?.testData);
-  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [testData, setTestData] = useState<TestData | null>(null);
+  // This state holds a map for faster lookups. Key is questionId.
+  const [answers, setAnswers] = useState<Record<string, AnswerPayload>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(!testData);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [results, setResults] = useState<{ score: string, totalQuestions: number } | null>(null);
 
   useEffect(() => {
-    // If the component loads without test data (e.g., on a resume/refresh), fetch it.
     const fetchSessionData = async () => {
-      if (!testData && sessionId) {
+      if (sessionId) {
+        setIsLoading(true);
         try {
-          setIsLoading(true);
           const response = await apiClient.get(`/sessions/${sessionId}`);
-          setTestData(response.data.data.test);
-          setAnswers(response.data.data.test.questions.map((q: Question) => ({ questionId: q.id })));
+          if (response.data.success) {
+            const fetchedTest = response.data.data.test;
+            const savedResponses: AnswerPayload[] = response.data.data.savedResponses;
+
+            setTestData(fetchedTest);
+            
+            // Convert the savedResponses array into a map
+            const answersMap: Record<string, AnswerPayload> = {};
+            savedResponses.forEach(res => {
+              answersMap[res.questionId] = res;
+            });
+            setAnswers(answersMap);
+
+            // Calculate which question to resume on.
+            let resumeIndex = 0;
+            if (savedResponses.length > 0 && fetchedTest.questions) {
+                const answeredQuestionIds = new Set(savedResponses.map((r: AnswerPayload) => r.questionId));
+                const firstUnansweredIndex = fetchedTest.questions.findIndex((q: Question) => !answeredQuestionIds.has(q.id));
+                
+                // If all questions are answered, start at the last one.
+                // Otherwise, start at the first unanswered one.
+                resumeIndex = firstUnansweredIndex === -1 ? fetchedTest.questions.length - 1 : firstUnansweredIndex;
+            }
+            setCurrentQuestionIndex(resumeIndex);
+          }
         } catch (error) {
-          toast.error("Could not load test session.");
-          navigate('/dashboard');
-        } finally {
-          setIsLoading(false);
+            toast.error("Could not load test session.");
+            navigate('/dashboard');
         }
+        finally { setIsLoading(false); }
       }
     };
-
     fetchSessionData();
-  }, [sessionId, testData, navigate]);
+  }, [sessionId, navigate, toast]);
 
-  const handleAnswerChange = (questionId: string, value: any) => {
-    setAnswers(prevAnswers =>
-      prevAnswers.map(ans =>
-        ans.questionId === questionId ? { ...ans, ...value } : ans
-      )
-    );
+  // --- THIS IS THE NEW, UNIFIED ANSWER HANDLER ---
+  const updateAnswer = (payload: AnswerPayload) => {
+    setAnswers(prevAnswers => ({
+      ...prevAnswers,
+      [payload.questionId]: payload,
+    }));
   };
-  
+
+  // --- THIS IS THE NEW, SIMPLIFIED SUBMIT HANDLER ---
   const handleSubmit = async () => {
-    if (!sessionId) return;
     setIsSubmitting(true);
     try {
-        const response = await apiClient.post(`/sessions/${sessionId}/submit`, { responses: answers });
-        setResults(response.data.data);
-        toast.success("Test Submitted!", {
-            description: `Your final score is ${response.data.data.score}%`,
+      // Convert the answers map back to an array for the API
+      const responsePayload = Object.values(answers);
+      const response = await apiClient.post(`/sessions/${sessionId}/submit`, { responses: responsePayload });
+      
+      if (response.data.success) {
+        toast.success(`Test Submitted! Final Score: ${response.data.data.score}%`, {
+            description: `You answered ${response.data.data.correctCount} out of ${response.data.data.totalQuestions} questions correctly.`
         });
+        navigate('/dashboard');
+      }
     } catch (err: any) {
-        toast.error('Submission Failed', {
-            description: err.response?.data?.message || "Could not submit your test."
-        });
+      toast.error('Submission Failed', {
+          description: err.response?.data?.message || "Could not submit your test."
+      });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (isLoading || !testData) {
+  const getSelectedValue = (questionId: string) => {
+    return answers[questionId];
+  };
+
+  // CRITICAL: Add a robust loading and error guard
+  if (isLoading) {
     return <div>Loading test session...</div>;
+  }
+  
+  if (!testData) {
+    return <div>Error: Test data could not be loaded.</div>;
   }
 
   const currentQuestion = testData.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / testData.questions.length) * 100;
-
-  // Render the test results dialog
-  if (results) {
-    return (
-        <Dialog open={true} onOpenChange={() => navigate('/dashboard')}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Test Completed!</DialogTitle>
-                    <DialogDescription>Here are your results for the test: "{testData.title}"</DialogDescription>
-                </DialogHeader>
-                <div className="text-center py-8">
-                    <p className="text-xl">Your Score:</p>
-                    <p className="text-6xl font-bold">{results.score}%</p>
-                    <p className="text-muted-foreground">({(Number(results.score) / 100 * results.totalQuestions).toFixed(0)} out of {results.totalQuestions} questions correct)</p>
-                </div>
-                <DialogFooter>
-                    <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-  }
 
   // Render the main test-taking UI
   return (
@@ -125,7 +136,10 @@ export default function TakeTestPage() {
         <CardContent className="min-h-[200px]">
           <h2 className="text-lg font-semibold mb-4">{currentQuestion.questionText}</h2>
           {currentQuestion.questionType === 'Multiple Choice' && (
-            <RadioGroup onValueChange={(value) => handleAnswerChange(currentQuestion.id, { selectedOptionId: value })}>
+            <RadioGroup
+              value={getSelectedValue(currentQuestion.id)?.selectedOptionId}
+              onValueChange={(value) => updateAnswer({ questionId: currentQuestion.id, selectedOptionId: value })}
+            >
               {currentQuestion.options.map(opt => (
                 <div key={opt.id} className="flex items-center space-x-2">
                   <RadioGroupItem value={opt.id} id={opt.id} />
@@ -135,10 +149,17 @@ export default function TakeTestPage() {
             </RadioGroup>
           )}
           {currentQuestion.questionType === 'Short Answer' && (
-             <Textarea placeholder="Your answer..." onChange={(e) => handleAnswerChange(currentQuestion.id, { shortAnswerText: e.target.value })} />
+            <Textarea 
+              placeholder="Your answer..." 
+              value={getSelectedValue(currentQuestion.id)?.shortAnswerText || ''}
+              onChange={(e) => updateAnswer({ questionId: currentQuestion.id, shortAnswerText: e.target.value })} 
+            />
           )}
           {currentQuestion.questionType === 'True/False' && (
-            <RadioGroup onValueChange={(value) => handleAnswerChange(currentQuestion.id, { trueFalseAnswer: value === 'true' })}>
+            <RadioGroup 
+              value={String(getSelectedValue(currentQuestion.id)?.trueFalseAnswer)}
+              onValueChange={(value) => updateAnswer({ questionId: currentQuestion.id, trueFalseAnswer: value === 'true' })}
+            >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="true" id="true" />
                   <Label htmlFor="true">True</Label>

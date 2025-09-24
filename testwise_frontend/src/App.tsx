@@ -10,6 +10,7 @@ import EditTestPage from './pages/EditTestPage';
 import TakeTestPage from './pages/TakeTestPage';
 import AvailableTestsPage from './pages/AvailableTestsPage';
 import DashboardIndex from './pages/DashboardIndex';
+import TestResultsPage from './pages/TestResultsPage';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="tests/:testId/edit" element={<EditTestPage />} />
             <Route path="available-tests" element={<AvailableTestsPage />} />
             <Route path="take-test/:sessionId" element={<TakeTestPage />} />
+            <Route path="tests/:testId/results" element={<TestResultsPage />} />
              
           </Route>
           <Route path="/tests/:testId/take" element={<TakeTestPage />} />

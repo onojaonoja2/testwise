@@ -65,7 +65,24 @@ export const sessionRoutes = new Elysia({ prefix: '/api/sessions' })
           return { success: false, message: 'Associated test not found.' };
       }
 
-      return { success: true, data: { test: testForTaker } };
+      // --- 3. NEW: Fetch existing responses for this session ---
+      const savedResponses = await db.query.responses.findMany({
+          where: eq(responses.sessionId, sessionId),
+          columns: {
+              questionId: true,
+              selectedOptionId: true,
+              shortAnswerText: true,
+              trueFalseAnswer: true
+          }
+      });
+
+      return { 
+        success: true, 
+        data: { 
+          test: testForTaker,
+          savedResponses: savedResponses // <-- Return the responses
+        } 
+      };
     },
     { params: t.Object({ sessionId: t.String({ format: 'uuid' }) }) }
   )
@@ -125,23 +142,46 @@ export const sessionRoutes = new Elysia({ prefix: '/api/sessions' })
             }
           });
 
-          // 4. Score the test
+          // --- THIS IS THE CORRECTED SCORING LOGIC WITH DIAGNOSTIC LOGS ---
           let correctCount = 0;
-          for (const correctAnswer of correctAnswers) {
-            const userResponse = userResponses.find(r => r.questionId === correctAnswer.id);
-            if (!userResponse) continue; // User skipped the question
+          console.log('--- STARTING SCORING PROCESS ---');
+          console.log('User responses received:', JSON.stringify(userResponses, null, 2));
+          console.log('Correct answers fetched from DB:', JSON.stringify(correctAnswers, null, 2));
 
-            if (correctAnswer.questionType === 'Multiple Choice') {
-              // Assumes only one correct option per question
-              const correctOptionId = correctAnswer.options[0]?.id;
-              if (correctOptionId && userResponse.selectedOptionId === correctOptionId) {
-                correctCount++;
+          for (const question of correctAnswers) {
+            console.log(`\n[Scoring Question ID]: ${question.id}`);
+            
+            const userResponse = userResponses.find(r => r.questionId === question.id);
+            
+            if (!userResponse) {
+              console.log('  -> No user response found for this question. Skipping.');
+              continue;
+            }
+            
+            console.log(`  -> User responded with:`, userResponse);
+
+            if (question.questionType === 'Multiple Choice') {
+              if (userResponse.selectedOptionId) {
+                const correctOption = question.options[0];
+                
+                console.log(`  -> Correct Option ID from DB: ${correctOption?.id} (Type: ${typeof correctOption?.id})`);
+                console.log(`  -> User's Selected Option ID: ${userResponse.selectedOptionId} (Type: ${typeof userResponse.selectedOptionId})`);
+
+                if (correctOption && userResponse.selectedOptionId === correctOption.id) {
+                  correctCount++;
+                  console.log('  ✅ MATCH! Incrementing score.');
+                } else {
+                  console.log('  ❌ NO MATCH.');
+                }
+              } else {
+                  console.log('  -> User response for MC question is missing a selectedOptionId.');
               }
             }
-            // Note: Auto-grading for True/False and Short Answer is not implemented here
-            // but could be added with more complex logic.
           }
-          
+
+          console.log(`--- FINAL SCORE CALCULATION ---`);
+          console.log(`Correct Count: ${correctCount} / Total Questions: ${correctAnswers.length}`);
+
           const totalQuestions = correctAnswers.length;
           const finalScore = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
 

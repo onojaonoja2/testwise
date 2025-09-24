@@ -153,6 +153,77 @@ export const testRoutes = new Elysia({ prefix: '/api/tests' })
             }
             return { success: true, message: 'Test deleted successfully.' };
         }, { params: t.Object({ id: t.String({ format: 'uuid' }) }) })
+
+        // --- NEW: Publish a Test ---
+        .post('/:id/publish', async ({ user, params, set }) => {
+          const { id } = params;
+          const [updatedTest] = await db
+            .update(tests)
+            .set({ status: 'Published' })
+            .where(and(eq(tests.id, id), eq(tests.creatorId, user!.id)))
+            .returning({ id: tests.id, status: tests.status });
+
+          if (!updatedTest) {
+            set.status = 404;
+            return { success: false, message: 'Test not found or permission denied.' };
+          }
+          return { success: true, message: 'Test published successfully.', data: updatedTest };
+        }, { params: t.Object({ id: t.String({ format: 'uuid' }) }) })
+
+        // --- NEW: Archive a Test ---
+        .post('/:id/archive', async ({ user, params, set }) => {
+          const { id } = params;
+          const [updatedTest] = await db
+            .update(tests)
+            .set({ status: 'Archived' })
+            .where(and(eq(tests.id, id), eq(tests.creatorId, user!.id)))
+            .returning({ id: tests.id, status: tests.status });
+            
+          if (!updatedTest) {
+            set.status = 404;
+            return { success: false, message: 'Test not found or permission denied.' };
+          }
+          return { success: true, message: 'Test archived successfully.', data: updatedTest };
+        }, { params: t.Object({ id: t.String({ format: 'uuid' }) }) })
+
+        // --- NEW: Get all results for a specific test ---
+        .get('/:id/results', async ({ user, params, set }) => {
+          const { id: testId } = params;
+
+          // 1. First, verify the user owns the test they are requesting results for
+          const test = await db.query.tests.findFirst({
+              where: and(eq(tests.id, testId), eq(tests.creatorId, user!.id)),
+              columns: { id: true, title: true }
+          });
+          
+          if (!test) {
+              set.status = 404;
+              return { success: false, message: 'Test not found or you do not have permission to view its results.' };
+          }
+
+          // 2. Fetch all sessions for this test, including the taker's email
+          const sessions = await db.query.testSessions.findMany({
+              where: eq(testSessions.testId, testId),
+              columns: {
+                  id: true,
+                  status: true,
+                  startedAt: true,
+                  completedAt: true,
+                  score: true
+              },
+              with: {
+                  // Join with the users table to get the taker's email
+                  taker: {
+                      columns: {
+                          email: true
+                      }
+                  }
+              },
+              orderBy: (testSessions, { desc }) => [desc(testSessions.startedAt)]
+          });
+
+          return { success: true, data: { testTitle: test.title, sessions } };
+        }, { params: t.Object({ id: t.String({ format: 'uuid' }) }) })
   )
   // --- Test Taker Route ---
   .post(
@@ -171,22 +242,35 @@ export const testRoutes = new Elysia({ prefix: '/api/tests' })
         set.status = 403;
         return { success: false, message: `Cannot start test. Test status is '${test.status}'.` };
       }
+      
       const existingSession = await db.query.testSessions.findFirst({
-        where: and(eq(testSessions.testId, testId), eq(testSessions.takerId, user!.id), eq(testSessions.status, 'In Progress')),
-        columns: { id: true }
+        where: and(
+          eq(testSessions.testId, testId),
+          eq(testSessions.takerId, user!.id)
+        ),
+        columns: { id: true, status: true } 
       });
+
       if (existingSession) {
-          // --- THIS IS THE NEW LOGIC ---
-          // Instead of a 409, return a 200 OK with the existing session info
-          return {
-            success: true,
-            message: 'An existing session is in progress.',
-            data: {
-              sessionState: 'in-progress',
-              sessionId: existingSession.id,
-            },
-          };
-        }
+          if (existingSession.status === 'Completed') {
+              set.status = 409;
+              return {
+                  success: false,
+                  message: 'You have already completed this test and cannot take it again.'
+              };
+          }
+          if (existingSession.status === 'In Progress') {
+              return {
+                  success: true,
+                  message: 'An existing session is in progress.',
+                  data: {
+                      sessionState: 'in-progress',
+                      sessionId: existingSession.id,
+                  },
+              };
+          }
+      }
+
       const [newSession] = await db.insert(testSessions).values({ testId, takerId: user!.id }).returning({ id: testSessions.id, startedAt: testSessions.startedAt });
       const testForTaker = await db.query.tests.findFirst({
         where: eq(tests.id, testId),
